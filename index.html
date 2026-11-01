@@ -1,0 +1,391 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>SKARP promptbygger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: fire kort (S, K, A, R) hænger på én lodret kæde til venstre; den færdige prompt står fast til højre; P ligger under prompten. */
+:root {
+  --bg: #EEEFEA;
+  --surface: #FFFFFF;
+  --field: #F6F7F2;
+  --ink: #1F241A;
+  --muted: #5F6656;
+  --line: #D9DCCF;
+  --green: #5E7C23;
+  --green-ink: #4A631B;
+  --green-soft: #C9D4B2;
+  --cream: #F2F1E4;
+  --focus: #2F4A00;
+  --warn: #9A5B00;
+  --display: "Open Sans", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151812; --surface: #1E2219; --field: #252A1F; --ink: #E9EBE2; --muted: #A3AA96; --line: #353B2D;
+    --green: #5E7C23; --green-ink: #A9C76A; --green-soft: #3A4A1E; --cream: #F2F1E4; --focus: #C4DE8A; --warn: #E0A24A;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151812; --surface: #1E2219; --field: #252A1F; --ink: #E9EBE2; --muted: #A3AA96; --line: #353B2D;
+  --green: #5E7C23; --green-ink: #A9C76A; --green-soft: #3A4A1E; --cream: #F2F1E4; --focus: #C4DE8A; --warn: #E0A24A;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1200px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 56px; }
+button { font: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Top */
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; margin-bottom: 8px; }
+.brand { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.mini { display: flex; align-items: center; }
+.mini a { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; text-decoration: none;
+  font-family: var(--display); font-weight: 700; font-size: 16px; color: var(--cream);
+  background: var(--green-soft); border: 2px solid var(--cream); box-shadow: 0 0 0 1px var(--green); transition: background .25s; }
+.mini a.done { background: var(--green); }
+.mini i { width: 12px; height: 3px; background: var(--green); }
+.brand p { margin: 0; color: var(--muted); }
+.lead { margin: 0 0 22px; color: var(--muted); max-width: 70ch; }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 7px 14px; border-radius: 999px; font-size: 14px; font-weight: 500; }
+.btn:hover:not(:disabled) { border-color: var(--green); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.primary { background: var(--green); border-color: var(--green); color: var(--cream); font-weight: 600; }
+.btn.danger { border-color: var(--warn); color: var(--warn); }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 28px; align-items: start; }
+
+/* Kæden af kort */
+.chain { position: relative; display: grid; gap: 18px; padding-left: 64px; }
+.chain::before { content: ""; position: absolute; left: 25px; top: 30px; bottom: 30px; width: 4px; background: var(--green); border-radius: 2px; }
+.card { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px 20px; min-width: 0; }
+.dot { position: absolute; left: -64px; top: 10px; width: 54px; height: 54px; border-radius: 50%;
+  background: var(--green-soft); color: var(--cream); border: 3px solid var(--cream); box-shadow: 0 0 0 1.5px var(--green);
+  display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 25px; transition: background .25s; }
+.card.done .dot { background: var(--green); }
+.card h2 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 19px; line-height: 1.25; }
+.card .q { margin: 2px 0 12px; color: var(--green-ink); font-weight: 500; }
+.opt { font-family: var(--body); font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 6px; }
+textarea { width: 100%; font: inherit; font-size: 15px; color: var(--ink); background: var(--field); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 12px; resize: vertical; min-height: 84px; line-height: 1.45; }
+textarea:focus { outline: 2px solid var(--focus); outline-offset: 0; border-color: transparent; }
+::placeholder { color: color-mix(in srgb, var(--muted) 80%, transparent); }
+.sub { display: grid; gap: 6px; margin-top: 12px; }
+.sub > span { font-weight: 600; font-size: 14px; }
+.sub > span em { font-style: normal; font-weight: 400; color: var(--muted); }
+.check { display: flex; gap: 9px; align-items: flex-start; margin-top: 12px; font-size: 14px; cursor: pointer; }
+.check input { accent-color: var(--green); width: 16px; height: 16px; margin-top: 3px; flex: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chips span { font-size: 13px; color: var(--muted); align-self: center; margin-right: 2px; }
+.chip { border: 1px solid var(--line); background: var(--field); color: var(--ink); border-radius: 999px; padding: 4px 11px; font-size: 13px; }
+.chip:hover { border-color: var(--green); }
+.tip { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
+
+/* Prompt og P */
+.side { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); display: grid; gap: 18px; }
+.out { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.out header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 14px 18px 0; }
+.out h3, .pcard h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 17px; }
+.meta { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.prompt { margin: 10px 18px 0; padding: 14px 16px; background: var(--field); border-radius: 8px; white-space: pre-wrap; word-break: break-word;
+  font-size: 14.5px; line-height: 1.6; max-height: 52vh; overflow: auto; min-height: 140px; }
+.prompt .ph { color: var(--muted); font-style: italic; }
+.note { margin: 8px 18px 0; font-size: 13px; color: var(--muted); }
+.note.ai { color: var(--green-ink); }
+.note button { border: 0; background: none; color: var(--green-ink); text-decoration: underline; padding: 0; font-size: 13px; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding: 12px 18px 16px; }
+.toast { min-height: 1.2em; font-size: 13px; color: var(--green-ink); font-weight: 600; padding: 0 18px 12px; margin-top: -6px; text-align: right; }
+
+.transfer { border: 1px dashed var(--green); border-radius: 12px; padding: 14px 18px; background: color-mix(in srgb, var(--green) 7%, var(--bg)); }
+.transfer h3 { margin: 0 0 6px; font-family: var(--display); font-weight: 700; font-size: 15px; color: var(--green-ink); }
+.transfer ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+.transfer b { font-weight: 600; }
+.manual { margin: 0 18px 16px; padding: 12px; border: 1px solid var(--warn); border-radius: 8px; display: grid; gap: 8px; }
+.manual p { margin: 0; font-size: 13.5px; }
+.manual textarea { min-height: 120px; font-size: 13px; }
+.manual .btn { justify-self: end; }
+.pcard { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px 18px 84px; }
+.pcard .dot { left: 16px; top: 14px; background: var(--green); }
+.pcard .q { margin: 2px 0 10px; color: var(--green-ink); font-weight: 500; }
+.pcard ul { margin: 0 0 14px; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.pcard h4 { margin: 0 0 6px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.follow { display: grid; gap: 6px; }
+.follow button { text-align: left; border: 1px solid var(--line); background: var(--field); color: var(--ink); border-radius: 8px; padding: 8px 12px; font-size: 14px; }
+.follow button:hover { border-color: var(--green); }
+.follow button small { display: block; color: var(--muted); font-size: 12px; }
+.eks { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--warn); border: 1px solid currentColor; border-radius: 4px; padding: 1px 6px; vertical-align: 2px; }
+
+@media (max-width: 980px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; }
+  .prompt { max-height: none; }
+}
+@media (max-width: 520px) {
+  .chain { padding-left: 0; gap: 14px; }
+  .chain::before { display: none; }
+  .card { padding-top: 16px; }
+  .card .dot { position: static; width: 40px; height: 40px; font-size: 19px; float: left; margin: 0 12px 4px 0; }
+  .card .q { clear: none; }
+  .card textarea, .card .sub, .card .check, .card .chips, .card .tip { clear: both; }
+  .pcard { padding-left: 18px; }
+  .pcard .dot { position: static; width: 40px; height: 40px; font-size: 19px; float: left; margin: 0 12px 4px 0; }
+  .pcard ul { clear: both; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <nav class="mini" id="mini" aria-label="Gå til trin"></nav>
+      <p>En huskeregel til samarbejdet med AI</p>
+    </div>
+    <div class="tools">
+      <button class="btn" id="loadEx" type="button">Vis eksempel</button>
+      <button class="btn" id="clearAll" type="button">Start forfra</button>
+    </div>
+  </div>
+  <p class="lead">Skriv med dine egne ord i de fire felter. Promptbyggeren sætter det sammen til en prompt, du kan kopiere. Du behøver ikke udfylde alt, men jo mere AI’en ved om situationen og materialet, jo bedre bliver svaret.</p>
+
+  <div class="grid">
+    <main class="chain" id="cards">
+      <section class="card" id="S">
+        <div class="dot" aria-hidden="true">S</div>
+        <h2>Sigte</h2>
+        <p class="q">Hvad skal laves, og hvad skal det bruges til?</p>
+        <textarea id="sigte" rows="3" aria-label="Sigte" placeholder="Fx: Skriv et udkast til en mail til forældrene om skolens nye mobilpolitik. Den skal få dem til at tale med deres børn om reglerne."></textarea>
+      </section>
+
+      <section class="card" id="K">
+        <div class="dot" aria-hidden="true">K</div>
+        <h2>Kontekst</h2>
+        <p class="q">Hvilken situation skal AI’en forstå?</p>
+        <textarea id="kontekst" rows="3" aria-label="Kontekst" placeholder="Fx: Mailen er til forældre i 4.-6. klasse. Mange har været kritiske over for forbuddet. Politikken træder i kraft efter efterårsferien."></textarea>
+        <p class="tip">Tænk på: Hvem er det til? Hvad sker der? Hvilke rammer skal overholdes?</p>
+      </section>
+
+      <section class="card" id="A">
+        <div class="dot" aria-hidden="true">A</div>
+        <h2>Arbejdsmateriale</h2>
+        <p class="q">Hvad skal AI’en arbejde ud fra?</p>
+        <label class="check"><input type="checkbox" id="vedhaeft"><span>Jeg vedhæfter filer til AI’en</span></label>
+        <label class="sub"><span>Dokumentation <em>AI’en må bruge det som fakta</em></span>
+          <textarea id="fakta" rows="3" placeholder="Fx: Skolebestyrelsens beslutning om mobilpolitikken (vedhæftet)"></textarea></label>
+        <label class="sub"><span>Inspiration <em>kun til form og stil, ikke fakta</em><span class="opt">valgfrit</span></span>
+          <textarea id="insp" rows="2" placeholder="Fx: Sidste års mail om lejrskolen, som forældrene tog godt imod"></textarea></label>
+      </section>
+
+      <section class="card" id="R">
+        <div class="dot" aria-hidden="true">R</div>
+        <h2>Resultat</h2>
+        <p class="q">Hvad kendetegner en brugbar leverance?</p>
+        <textarea id="resultat" rows="3" aria-label="Resultat" placeholder="Fx: Højst 200 ord, venlig og tydelig tone, med en overskrift og tre korte afsnit."></textarea>
+        <div class="chips" id="chips"><span>Tilføj:</span></div>
+        <label class="check"><input type="checkbox" id="gaet" checked><span>Bed AI’en spørge i stedet for at gætte, når noget mangler eller modsiger hinanden</span></label>
+      </section>
+    </main>
+
+    <aside class="side">
+      <section class="out" aria-label="Din prompt">
+        <header><h3>Din prompt <span id="exTag"></span></h3><span class="meta" id="meta"></span></header>
+        <div class="prompt" id="prompt" tabindex="0"></div>
+        <p class="note" id="note" hidden></p>
+        <div class="bar">
+          <button class="btn" id="copy" type="button">Kopiér kun prompten</button>
+          <button class="btn primary" id="copilot" type="button">Kopiér ind i Copilot og gør den skarpere</button>
+        </div>
+        <div class="toast" id="toast" role="status"></div>
+        <div class="manual" id="manual" hidden>
+          <p>Kopiering er blokeret her. Teksten er markeret: tryk <b>Cmd+C</b> (Mac) eller <b>Ctrl+C</b> (Windows).</p>
+          <textarea id="manualText" readonly rows="6" aria-label="Tekst til kopiering"></textarea>
+          <button class="btn" type="button" id="manualClose">Luk</button>
+        </div>
+      </section>
+
+      <section class="transfer" aria-label="Videre i Copilot">
+        <h3>Videre i Copilot</h3>
+        <ol>
+          <li><b>Sæt ind og vedhæft.</b> Åbn en ny chat i Copilot, sæt teksten ind, og vedhæft dine filer i samme besked.</li>
+          <li><b>Læs Copilots version.</b> Copilot viser en skarpere prompt og skriver, hvad den har ændret. Har den tilføjet noget, du ikke har sagt? Så ret det.</li>
+          <li><b>Skriv OK.</b> Først nu løser Copilot opgaven. Derfra fortsætter du med P herunder, i samme chat.</li>
+        </ol>
+      </section>
+
+      <section class="pcard" id="P">
+        <div class="dot" aria-hidden="true">P</div>
+        <h3>Prøv og præcisér</h3>
+        <p class="q">Holder resultatet, og hvad skal justeres?</p>
+        <ul>
+          <li>Står fakta, tal og datoer faktisk i dit materiale?</li>
+          <li>Passer form, længde og tone til det, du bad om?</li>
+          <li>Har AI’en tilføjet noget, du ikke har givet den?</li>
+          <li>Kan du bruge resultatet til det, det skal bruges til?</li>
+        </ul>
+        <h4>Arbejd videre i samme chat</h4>
+        <div class="follow" id="follow"></div>
+        <p class="tip">Er samtalen kørt skævt? Ret felterne ovenfor, og start en ny chat med den nye prompt. Husk at vedhæfte filerne igen.</p>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const FIELDS = ["sigte", "kontekst", "fakta", "insp", "resultat"];
+  const CHIPS = ["Højst 200 ord", "Punktliste", "Tabel", "Enkelt sprog", "Venlig tone", "Saglig tone", "Tre forslag at vælge imellem", "Henvis til kilden"];
+  const FOLLOW = [
+    ["Ret kun en del", "Behold resten af svaret. Ret kun dette: [beskriv]."],
+    ["Tjek mod materialet", "Gå dit svar igennem, og markér alt, der ikke står i det materiale, jeg har givet dig."],
+    ["For svært", "Forklar det med almindelige ord, og giv mig kun det første trin."],
+    ["Saml op", "Lav en kort opsamling af vores mål, krav og det, vi er blevet enige om, så jeg kan starte en ny chat med den."]
+  ];
+  const EXAMPLE = {
+    sigte: "Skriv et udkast til et brev til borgere om, at ansøgning om hjælpemidler flytter fra papirblanket til digital selvbetjening. Brevet skal få flere til at bruge selvbetjeningen.",
+    kontekst: "Brevet er til borgere over 65, som tidligere har søgt på papir. Mange er usikre på det digitale. Selvbetjeningen åbner om to måneder, men borgerne kan stadig få hjælp på borgerservice og over telefonen. Brevet sendes via Digital Post.",
+    fakta: "Projektbeskrivelsen for den digitale løsning og kommunens skrivevejledning",
+    insp: "Et tidligere borgerbrev om digital pladsanvisning",
+    resultat: "Højst én side. Venlig og konkret tone uden fagsprog. En overskrift, tre korte afsnit og kontaktoplysninger til sidst.",
+    vedhaeft: true, gaet: true
+  };
+  const blank = () => ({ sigte: "", kontekst: "", fakta: "", insp: "", resultat: "", vedhaeft: false, gaet: true });
+  const KEY = "skarp-v2";
+
+  let state, polished = null, isExample = false;
+  try { state = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!state || typeof state !== "object") { state = { ...EXAMPLE }; isExample = true; }
+  else { state = Object.assign(blank(), state); isExample = !!state._ex; }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ ...state, _ex: isExample })); } catch (e) {} };
+
+  const grow = el => { el.style.height = "auto"; el.style.height = (el.scrollHeight + 2) + "px"; };
+  addEventListener("resize", () => FIELDS.forEach(f => grow($("#" + f))));
+  function fill() {
+    FIELDS.forEach(f => { const el = $("#" + f); el.value = state[f] || ""; grow(el); });
+    $("#vedhaeft").checked = !!state.vedhaeft;
+    $("#gaet").checked = !!state.gaet;
+  }
+
+  // ---------- Prompten skrives som sammenhængende tekst ----------
+  const t = s => (s || "").trim();
+  const end = s => /[.!?:]["”)]?$/.test(s) ? s : s + ".";
+  // Kort tekst står efter kolon; lang eller flerlinjet tekst får sin egen linje.
+  const lead = (intro, s) => (s.includes("\n") || s.length > 160) ? `${intro}:\n${s}` : `${intro}: ${s}`;
+
+  function build() {
+    const S = t(state.sigte), K = t(state.kontekst), F = t(state.fakta), I = t(state.insp), R = t(state.resultat);
+    const p = [];
+    if (S) p.push(end(S));
+    if (K) p.push(lead("Det skal du vide om situationen", end(K)));
+    const a = [];
+    if (state.vedhaeft && F) a.push(lead("Jeg har vedhæftet det materiale, du skal arbejde ud fra", end(F)));
+    else if (state.vedhaeft) a.push("Jeg har vedhæftet det materiale, du skal arbejde ud fra.");
+    else if (F) a.push(lead("Du skal arbejde ud fra dette materiale", end(F)));
+    if (state.vedhaeft || F) a.push("Brug det som grundlag for alle fakta, og tilføj ikke oplysninger, der ikke står i det.");
+    if (a.length) p.push(a.join(a.some(x => x.includes("\n")) ? "\n" : " "));
+    if (I) p.push(lead("Til inspiration", end(I)) + (I.includes("\n") || I.length > 160 ? "\n" : " ") + "Brug det kun til form og stil, ikke som kilde til fakta.");
+    if (R) p.push(lead("Sådan skal svaret se ud", end(R)));
+    if (state.gaet && p.length) p.push("Hvis der mangler oplysninger, eller hvis noget er uklart eller modstridende, så spørg mig, før du går i gang. Gæt ikke.");
+    return p.join("\n\n");
+  }
+
+  function render() {
+    const txt = polished ?? build();
+    const box = $("#prompt");
+    if (!txt) box.innerHTML = '<span class="ph">Begynd med Sigte. Prompten bliver skrevet her, mens du udfylder felterne.</span>';
+    else box.textContent = txt;
+    const words = txt ? txt.split(/\s+/).filter(Boolean).length : 0;
+    $("#meta").textContent = words ? `${words} ord` : "";
+    $("#copy").disabled = !txt;
+    $("#copilot").disabled = !txt;
+    $("#exTag").innerHTML = isExample ? '<span class="eks">Eksempel</span>' : "";
+    const note = $("#note");
+    if (polished) { note.hidden = false; note.className = "note ai"; note.innerHTML = 'Omskrevet af Claude. Læs den igennem, og tjek at intet er ændret. <button type="button" id="undo">Brug min egen version</button>'; $("#undo").onclick = () => { polished = null; render(); }; }
+    else if (!note.dataset.err) { note.hidden = true; }
+    const done = { S: !!t(state.sigte), K: !!t(state.kontekst), A: !!(t(state.fakta) || t(state.insp) || state.vedhaeft), R: !!t(state.resultat) };
+    Object.entries(done).forEach(([k, v]) => { document.getElementById(k).classList.toggle("done", v); const m = document.querySelector(`#mini a[href="#${k}"]`); m && m.classList.toggle("done", v); });
+  }
+
+  function changed() { polished = null; isExample = false; const n = $("#note"); delete n.dataset.err; render(); save(); }
+
+  // ---------- Opsætning ----------
+  const mini = $("#mini");
+  "SKARP".split("").forEach((k, i) => {
+    if (i) mini.appendChild(document.createElement("i"));
+    const a = document.createElement("a"); a.href = "#" + k; a.textContent = k; a.setAttribute("aria-label", "Gå til " + k);
+    if (k === "P") a.classList.add("done");
+    mini.appendChild(a);
+  });
+  const chips = $("#chips");
+  CHIPS.forEach(c => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = c;
+    b.onclick = () => { const ta = $("#resultat"); const v = t(ta.value); ta.value = v ? `${end(v)} ${c}.` : `${c}.`; state.resultat = ta.value; grow(ta); changed(); };
+    chips.appendChild(b);
+  });
+  const follow = $("#follow");
+  FOLLOW.forEach(([h, txt]) => {
+    const b = document.createElement("button"); b.type = "button";
+    b.innerHTML = `${txt.replace(/&/g, "&amp;").replace(/</g, "&lt;")}<small>${h}. Klik for at kopiere</small>`;
+    b.onclick = () => copyText(txt, "Kopieret. Sæt den ind i samme chat.");
+    follow.appendChild(b);
+  });
+
+  $("#cards").addEventListener("input", e => {
+    const el = e.target;
+    if (FIELDS.includes(el.id)) { state[el.id] = el.value; grow(el); }
+    else if (el.id === "vedhaeft" || el.id === "gaet") state[el.id] = el.checked;
+    else return;
+    changed();
+  });
+
+  let toastT;
+  const toast = m => { $("#toast").textContent = m; clearTimeout(toastT); toastT = setTimeout(() => $("#toast").textContent = "", 2800); };
+  function copyText(txt, msg) {
+    const fallback = () => {
+      const box = $("#manual"), ta = $("#manualText");
+      box.hidden = false; ta.value = txt; ta.focus(); ta.select();
+      toast("");
+    };
+    try { navigator.clipboard.writeText(txt).then(() => toast(msg), fallback); } catch (e) { fallback(); }
+  }
+  $("#manualClose").onclick = () => { $("#manual").hidden = true; };
+  $("#copy").onclick = () => copyText(polished ?? build(), "Kopieret. Sæt den ind i dit AI-værktøj.");
+
+  let armed = null;
+  $("#clearAll").onclick = e => {
+    const b = e.currentTarget;
+    if (!armed) {
+      b.textContent = "Klik igen for at rydde"; b.classList.add("danger");
+      armed = setTimeout(() => { armed = null; b.textContent = "Start forfra"; b.classList.remove("danger"); }, 3000);
+      return;
+    }
+    clearTimeout(armed); armed = null; b.textContent = "Start forfra"; b.classList.remove("danger");
+    state = blank(); isExample = false; polished = null; fill(); render(); save(); $("#sigte").focus();
+  };
+  $("#loadEx").onclick = () => { state = { ...EXAMPLE }; isExample = true; polished = null; fill(); render(); save(); };
+
+  // ---------- Kopiér ind i Copilot ----------
+  const META = draft => `Jeg har skrevet et udkast til en prompt. Gør den skarpere, før du løser opgaven.
+
+Regler for din omskrivning:
+- Behold alle mine oplysninger, krav og begrænsninger. Tilføj ingen nye fakta, krav eller antagelser.
+- Behold skellet mellem det materiale, der er dokumentation, og det, der kun er inspiration.
+- Ret sprog og rækkefølge, så prompten er klar og let at forstå.
+- Hvis der mangler noget vigtigt, så skriv det som et spørgsmål til mig i stedet for at gætte.
+
+Vis mig den forbedrede prompt, og skriv kort under den, hvad du har ændret. Løs ikke opgaven endnu. Når jeg skriver OK, løser du opgaven ud fra den forbedrede prompt.
+
+Mit udkast:
+"""
+${draft}
+"""`;
+  $("#copilot").onclick = () => copyText(META(build()), "Kopieret. Sæt den ind i Copilot, og følg trinnene herunder.");
+
+  fill(); render();
+})();
+</script>
+
+</body></html>
